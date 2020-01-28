@@ -26,7 +26,7 @@ const cars = [{
 //The `price` is updated from step 1 and 2
 //The `commission` is updated from step 3
 //The `options` is useful for step 4
-const rentals = [{
+let rentals = [{
   'id': '893a04a3-e447-41fe-beec-9a6bfff6fdb4',
   'driver': {
     'firstName': 'Roman',
@@ -87,7 +87,7 @@ const rentals = [{
 
 //list of actors for payment
 //useful from step 5
-const actors = [{
+let actors = [{
   'rentalId': '893a04a3-e447-41fe-beec-9a6bfff6fdb4',
   'payment': [{
     'who': 'driver',
@@ -110,7 +110,7 @@ const actors = [{
     'type': 'credit',
     'amount': 0
   }]
-}, {
+},{
   'rentalId': 'bc16add4-9b1d-416c-b6e8-2d5103cade80',
   'payment': [{
     'who': 'driver',
@@ -158,6 +158,121 @@ const actors = [{
   }]
 }];
 
-console.log(cars);
+// Calcultate rental days from pickup and return dates
+const calculateDays = rent => {
+  const startDate = Date.parse(rent["pickupDate"]);
+  const endDate = Date.parse(rent["returnDate"]);
+  return ((((endDate - startDate) / 1000 ) / 3600) / 24) + 1;
+}
+// Return the car corresponding to a given id
+const foundCar = id => {
+  let ret = null
+  cars.forEach(car=>{
+    if(car["id"] === id){
+      ret = car;
+    }
+  })
+  return ret;
+}
+
+// Return the car corresponding to a given id
+const foundRent = id => {
+  let ret = null
+  rentals.forEach(rent=>{
+    if(rent["id"] === id){
+      ret = rent;
+    }
+  })
+  return ret;
+}
+
+// Apply duscount on a price depending of the rental time in days
+const discountPrice = (price, days) => {
+  if      (days>10) return price*0.5
+  else if (days>4)  return price*0.7
+  else if (days>1)  return price*0.9
+  else              return price
+}
+
+// Update all prices of rentals
+const calculatePrices = rentals => {
+  rentals.forEach(rent => {
+
+    const car = foundCar(rent["carId"]);
+    let days = calculateDays(rent);
+    let price = (car["pricePerDay"]*days) + (car["pricePerKm"]*rent["distance"]);
+
+    price = discountPrice(price,days);
+    rent["price"] = price;
+  })
+}
+
+// Update all Commissions of rentals
+const calculateCommissions = rentals => {
+  rentals.forEach(rent => {
+    let days = calculateDays(rent);
+    let price = rent["price"];
+
+    const commission = price*0.3;
+    let insuranceCom = commission/2;
+    let rest = insuranceCom - days;
+
+    rent["commission"] = {
+      "total" : commission,
+      "insurance" : insuranceCom,
+      "treasury" : days,
+      "virtuo" : rest
+    }
+  })
+}
+
+// Update all prices with options
+const calculateOptions = rentals => {
+  rentals.forEach(rent => {
+    let days = calculateDays(rent);
+    if(rent["options"]["deductibleReduction"]){
+      rent["price"] += days*4;
+      rent["options"]["deductibleReductionAmount"] = days*4;
+    }
+  })
+}
+
+// generate payment object
+const generatePayment = (who, type, amount) => {
+  return {
+    "who" : who,
+    "type" : type,
+    "amoount" : amount
+  }
+}
+
+// Update actors
+const updateActors = actors => {
+  actors.forEach(actor => {
+
+    const rent = foundRent(actor["rentalId"]);
+    const deductibleReductionAmount = rent["options"]["deductibleReductionAmount"];
+    let payments = []
+    payments.push(generatePayment("driver","debit",rent["price"]));
+    payments.push(generatePayment("partner","credit",rent["price"] - rent["commission"]["total"] - deductibleReductionAmount));
+    payments.push(generatePayment("insurance","credit",rent["commission"]["insurance"]));
+    payments.push(generatePayment("treasury","credit",rent["commission"]["insurance"]));
+    payments.push(generatePayment("virtuo","credit",rent["commission"]["virtuo"] + deductibleReductionAmount));
+
+    actor["payment"] = payments;
+  })
+}
+
+
+// Step 1 and 2
+calculatePrices(rentals);
+// Step 3
+calculateCommissions(rentals);
+// Step 4
+calculateOptions(rentals);
+// Step 5
+updateActors(actors);
+
+// console.log(cars);
 console.log(rentals);
-console.log(actors);
+// console.log(actors);
